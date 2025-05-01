@@ -37,7 +37,7 @@ public class Robot extends TimedRobot {
 
   private static final double WHEEL_ROTATIONS_PER_MOTOR_ROTATION = (1.0 / (150.0 / 7.0));
 
-  private static final int kMotorPort = 15;
+  private static final int kMotorPort = 10;
   private static final int kJoystickPort = 0;
 
   private final SparkMax m_motor;
@@ -47,7 +47,7 @@ public class Robot extends TimedRobot {
   private final XboxController m_joystick;
   private final RelativeEncoder m_encoder;
 
-  private double p = 1.0;
+  private double p = 0.2;
   private double i = 0.0;
   private double d = 0.0;
 
@@ -119,24 +119,30 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopPeriodic() {
     // Get the joystick angle and convert it to a setpoint for the motor
-    Rotation2d rotation = Rotation2d.fromDegrees(calculateStickAngle());
+    Rotation2d rotation = Rotation2d.fromRadians(calculateStickAngle());
+    Rotation2d currentRotation = Rotation2d.fromRotations(m_encoder.getPosition() * WHEEL_ROTATIONS_PER_MOTOR_ROTATION);
+    Rotation2d difference = currentRotation.minus(rotation);
 
     double motorSetpoint = rotation.getRotations() / WHEEL_ROTATIONS_PER_MOTOR_ROTATION;
+    double motorPosition = m_encoder.getPosition();
+
 
     // Set the motor setpoint based on the joystick angle
-    m_pidController.setSetpoint(motorSetpoint);
+    /*m_pidController.setSetpoint(motorSetpoint);
 
     // Calculate the PID output and clamp it to the motor speed limits
     double output = m_pidController.calculate(m_encoder.getPosition());
-    output = MathUtil.clamp(output, MIN_SPEED, MAX_SPEED);
+    //output = MathUtil.clamp(output, MIN_SPEED, MAX_SPEED);
 
     // Set the motor speed
     if (!m_pidController.atSetpoint())  {
       m_motor.set(output);
+    } else {
+      m_motor.set(0);
     }
+  */
 
-
-   // m_motorController.setReference(motorSetpoint, ControlType.kPosition);
+   m_motorController.setReference(motorSetpoint, ControlType.kPosition);
   }
 
   private double calculateStickAngle() {
