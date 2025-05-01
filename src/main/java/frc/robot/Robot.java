@@ -4,9 +4,15 @@
 
 package frc.robot;
 
+import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkBase.ControlType;
+import com.revrobotics.spark.SparkBase.PersistMode;
+import com.revrobotics.spark.SparkBase.ResetMode;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.config.ClosedLoopConfig;
+import com.revrobotics.spark.config.SparkFlexConfig;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.controller.PIDController;
@@ -35,22 +41,33 @@ public class Robot extends TimedRobot {
   private static final int kJoystickPort = 0;
 
   private final SparkMax m_motor;
+  private final SparkClosedLoopController m_motorController;
+  private final SparkFlexConfig m_motorConfig = new SparkFlexConfig();
+  private final ClosedLoopConfig m_closedLoopConfig = new ClosedLoopConfig();
   private final XboxController m_joystick;
   private final RelativeEncoder m_encoder;
 
-  private final PIDController m_pidController = new PIDController(0.1, 0.0, 0.0);
+  private double p = 1.0;
+  private double i = 0.0;
+  private double d = 0.0;
+
+  private final PIDController m_pidController = new PIDController(p, i, d);
 
   /** Called once at the beginning of the robot program. */
   public Robot() {
     m_motor = new SparkMax(kMotorPort, MotorType.kBrushless);
+    m_motorController = m_motor.getClosedLoopController();
     m_joystick = new XboxController(kJoystickPort);
     m_encoder = m_motor.getEncoder();
 
     m_pidController.setTolerance(0.05);
+    m_closedLoopConfig.pid(p, i, d);
+    m_motorConfig.apply(m_closedLoopConfig);
+    m_motor.configure(m_motorConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
 
-    SmartDashboard.putNumber("P", m_pidController.getP());
-    SmartDashboard.putNumber("I", m_pidController.getI());
-    SmartDashboard.putNumber("D", m_pidController.getD());
+    SmartDashboard.putNumber("P", p);
+    SmartDashboard.putNumber("I", i);
+    SmartDashboard.putNumber("D", d);
   }
 
   /*
@@ -67,19 +84,34 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Wheel Angle (Radians)",Rotation2d.fromRotations(m_encoder.getPosition() * WHEEL_ROTATIONS_PER_MOTOR_ROTATION).getRadians());
 
     // Get PID values from SmartDashboard
-    double p = SmartDashboard.getNumber("P", 0.0);
-    double i = SmartDashboard.getNumber("I", 0.0);
-    double d = SmartDashboard.getNumber("D", 0.0);
+    double np = SmartDashboard.getNumber("P", 0.0);
+    double ni = SmartDashboard.getNumber("I", 0.0);
+    double nd = SmartDashboard.getNumber("D", 0.0);
 
     // Update PID controller values
-    if (p != m_pidController.getP()) {
+    boolean setConfig = false;
+    if (p != np) {
+      p = np;
       m_pidController.setP(p);
+      m_closedLoopConfig.p(p);
+      setConfig = true;
     }
-    if (i != m_pidController.getI()) {
+    if (i != ni) {
+      i = ni;
       m_pidController.setI(i);
+      m_closedLoopConfig.i(i);
+      setConfig = true;
     }
-    if (d != m_pidController.getD()) {
+    if (d != nd) {
+      d = nd;
       m_pidController.setD(d);
+      m_closedLoopConfig.d(d);
+      setConfig = true;
+    }
+
+    if (setConfig) {
+      m_motorConfig.apply(m_closedLoopConfig);
+      m_motor.configure(m_motorConfig, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters);
     }
   }
 
@@ -102,6 +134,9 @@ public class Robot extends TimedRobot {
     if (!m_pidController.atSetpoint())  {
       m_motor.set(output);
     }
+
+
+   // m_motorController.setReference(motorSetpoint, ControlType.kPosition);
   }
 
   private double calculateStickAngle() {
@@ -109,7 +144,7 @@ public class Robot extends TimedRobot {
     double y = m_joystick.getLeftY();
 
     double angle = Math.atan2(y, x);
-    angle += Math.PI / 2; // Adjust for the joystick orientation
+    //angle += Math.PI / 2; // Adjust for the joystick orientation
 
     return angle;
   }
